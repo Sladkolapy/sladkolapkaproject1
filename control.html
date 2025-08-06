@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Управление | NFC Lock</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --tg-theme-bg-color: #0f0f0f;
+            --tg-theme-text-color: #ffffff;
+            --tg-theme-button-color: #2ea6ff;
+            --tg-theme-secondary-bg-color: #1f1f1f;
+        }
+    </style>
+</head>
+<body>
+    <div class="tg-app">
+        <div class="header">
+            <h1 id="user-name">Привет!</h1>
+            <div class="lock-status" id="lock-status">🔒 Заблокирован</div>
+        </div>
+
+        <div class="nfc-area">
+            <div class="nfc-icon">📱</div>
+            <div class="nfc-hint" id="nfc-hint">Приложите телефон к замку</div>
+        </div>
+
+        <button class="action-btn" id="action-btn">Закрыть</button>
+        <button class="btn-logout" id="logout-btn">Выйти</button>
+
+        <div class="hash-display">
+            ID: <span id="connection-hash">xxxxyyyy</span>
+        </div>
+    </div>
+
+    <script>
+        // Параметры из URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const firstName = urlParams.get('firstName') || 'Пользователь';
+        const hash = urlParams.get('hash') || 'xxxxyyyy';
+
+        // Инициализация
+        document.getElementById('user-name').textContent = `Привет, ${firstName}!`;
+        document.getElementById('connection-hash').textContent = hash;
+
+        // Логика кнопки
+        let isLocked = true;
+        document.getElementById('action-btn').addEventListener('click', () => {
+            isLocked = !isLocked;
+            const btn = document.getElementById('action-btn');
+            const status = document.getElementById('lock-status');
+            const hint = document.getElementById('nfc-hint');
+            
+            if (isLocked) {
+                btn.textContent = 'Закрыть';
+                btn.classList.remove('active');
+                status.textContent = '🔒 Заблокирован';
+                hint.textContent = 'Приложите телефон к замку';
+            } else {
+                btn.textContent = 'Открыть';
+                btn.classList.add('active');
+                status.textContent = '🔓 Разблокирован';
+                hint.textContent = 'Готов к NFC';
+                setTimeout(() => hint.textContent = 'Ключ сохранён!', 800);
+            }
+        });
+
+        // Кнопка выхода
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            localStorage.removeItem('nfcLockUserData');
+            window.location.href = 'index.html';
+        });
+    </script>
+</body>
+</html>
