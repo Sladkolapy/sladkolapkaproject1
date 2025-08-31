@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Фитнес-клуб - Сканирование</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .scan-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+        }
+        .time-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #4CAF50;
+            border-radius: 10px;
+            background-color: #f9f9f9;
+            display: none;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .lock-btn {
+            background-color: #4CAF50;
+            display: none;
+        }
+        .back-btn {
+            background-color: #f1f1f1;
+            color: #333;
+        }
+        .success-msg {
+            color: #4CAF50;
+            font-weight: bold;
+            margin: 15px 0;
+            font-size: 18px;
+            display: none;
+        }
+        .error {
+            color: red;
+            margin: 10px 0;
+        }
+        .timer {
+            font-size: 20px;
+            font-weight: bold;
+            color: #FF5722;
+            margin: 15px 0;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Сканирование шкафчика</h1>
+        
+        <div class="scan-section">
+            <p>Наведите камеру на QR-код шкафчика</p>
+            <button id="startCamera">Включить камеру</button>
+            <video id="video" style="display: none; width: 100%; max-width: 400px; height: 300px; border-radius: 10px;"></video>
+            
+            <div style="margin: 20px 0;">
+                <p>Или введите номер шкафчика вручную:</p>
+                <input type="number" id="manualLockerInput" placeholder="Номер шкафчика" min="1">
+                <button id="confirmManual">Подтвердить</button>
+            </div>
+        </div>
+        
+        <div class="time-section" id="timeSection">
+            <h3>Введите время тренировки</h3>
+            <input type="time" id="trainingTime" required>
+            <button id="confirmTime">Подтвердить время</button>
+        </div>
+        
+        <div id="successMsg" class="success-msg"></div>
+        <div id="error" class="error"></div>
+        
+        <div id="timer" class="timer"></div>
+        
+        <button id="lockBtn" class="lock-btn">Заблокировать шкафчик</button>
+        
+        <button class="back-btn" onclick="location.href='index.html'">На главную</button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    
+    <script>
+        let currentLockerNumber = null;
+        let videoStream = null;
+        let scanningInterval = null;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const startCameraBtn = document.getElementById('startCamera');
+            const video = document.getElementById('video');
+            const manualInput = document.getElementById('manualLockerInput');
+            const confirmManualBtn = document.getElementById('confirmManual');
+            const timeSection = document.getElementById('timeSection');
+            const trainingTime = document.getElementById('trainingTime');
+            const confirmTimeBtn = document.getElementById('confirmTime');
+            const successMsg = document.getElementById('successMsg');
+            const errorDiv = document.getElementById('error');
+            const timerDiv = document.getElementById('timer');
+            const lockBtn = document.getElementById('lockBtn');
+            
+            // Проверяем, есть ли активный шкафчик
+            const activeLocker = localStorage.getItem('currentLocker');
+            if (activeLocker) {
+                errorDiv.textContent = 'У вас уже есть активный шкафчик. Перейдите в раздел "Мой шкафчик".';
+                startCameraBtn.disabled = true;
+                confirmManualBtn.disabled = true;
+                return;
+            }
+            
+            // Функция обработки найденного шкафчика
+            function handleLockerFound(lockerNumber) {
+                currentLockerNumber = lockerNumber;
+                
+                // Сохраняем номер шкафчика
+                localStorage.setItem('currentLocker', lockerNumber);
+                
+                // Останавливаем камеру
+                stopCamera();
+                
+                // Показываем секцию ввода времени
+                timeSection.style.display = 'block';
+                successMsg.style.display = 'block';
+                successMsg.textContent = `Найден шкафчик №${lockerNumber}`;
+                successMsg.style.color = '#4CAF50';
+                
+                // Скрываем секцию сканирования
+                document.querySelector('.scan-section').style.display = 'none';
+            }
+            
+            // Функция запуска камеры
+            async function startCamera() {
+                try {
+                    videoStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: "environment" },
+                        audio: false
+                    });
+                    
+                    video.srcObject = videoStream;
+                    video.setAttribute("playsinline", true);
+                    video.style.display = 'block';
+                    startCameraBtn.style.display = 'none';
+                    
+                    await video.play();
+                    
+                    // Запускаем сканирование
+                    startScanning();
+                    
+                } catch (error) {
+                    console.error('Ошибка доступа к камере:', error);
+                    errorDiv.textContent = 'Не удалось получить доступ к камере. Используйте ручной ввод.';
+                }
+            }
+            
+            // Функция остановки камеры
+            function stopCamera() {
+                if (videoStream) {
+                    videoStream.getTracks().forEach(track => track.stop());
+                    videoStream = null;
+                }
+                
+                if (scanningInterval) {
+                    clearInterval(scanningInterval);
+                    scanningInterval = null;
+                }
+                
+                video.style.display = 'none';
+                startCameraBtn.style.display = 'block';
+            }
+            
+            // Функция сканирования QR-кодов
+            function startScanning() {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                
+                scanningInterval = setInterval(() => {
+                    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        
+                        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                        
+                        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                            inversionAttempts: "dontInvert",
+                        });
+                        
+                        if (code) {
+                            handleLockerFound(code.data);
+                        }
+                    }
+                }, 100);
+            }
+            
+            // Обработчики кнопок
+            startCameraBtn.addEventListener('click', startCamera);
+            
+            confirmManualBtn.addEventListener('click', function() {
+                const lockerNumber = manualInput.value;
+                if (!lockerNumber) {
+                    errorDiv.textContent = 'Введите номер шкафчика';
+                    return;
+                }
+                handleLockerFound(lockerNumber);
+            });
+            
+            confirmTimeBtn.addEventListener('click', function() {
+                if (!trainingTime.value) {
+                    errorDiv.textContent = 'Выберите время тренировки';
+                    return;
+                }
+                
+                // Получаем пользователя
+                const user = JSON.parse(localStorage.getItem('user'));
+                if (!user) {
+                    errorDiv.textContent = 'Ошибка: данные пользователя не найдены';
+                    return;
+                }
+                
+                // Показываем сообщение
+                successMsg.textContent = `Продуктивной тренировки, ${user.firstName}!`;
+                
+                // Скрываем секцию времени
+                timeSection.style.display = 'none';
+                
+                // Показываем кнопку блокировки
+                lockBtn.style.display = 'block';
+                
+                // Запускаем таймер
+                startTimer(trainingTime.value);
+            });
+            
+            lockBtn.addEventListener('click', async function() {
+                try {
+                    const response = await fetch(`http://38.180.211.208:5000/api/access-modules/${currentLockerNumber}/toggle`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({})
+                    });
+                    
+                    if (response.ok) {
+                        successMsg.textContent = 'Шкафчик успешно заблокирован!';
+                        lockBtn.style.display = 'none';
+                        
+                        // Переходим на страницу управления через 2 секунды
+                        setTimeout(() => {
+                            window.location.href = 'locker.html';
+                        }, 2000);
+                    } else {
+                        errorDiv.textContent = 'Ошибка при блокировке шкафчика';
+                    }
+                } catch (error) {
+                    console.error('Ошибка:', error);
+                    errorDiv.textContent = 'Произошла ошибка. Проверьте подключение к интернету.';
+                }
+            });
+            
+            function startTimer(timeString) {
+                const [hours, minutes] = timeString.split(':');
+                const totalMinutes = parseInt(hours) * 60 + parseInt(minutes);
+                let remainingMinutes = totalMinutes;
+                
+                timerDiv.style.display = 'block';
+                
+                function updateTimer() {
+                    const hoursLeft = Math.floor(remainingMinutes / 60);
+                    const minutesLeft = remainingMinutes % 60;
+                    
+                    timerDiv.textContent = `Осталось времени: ${hoursLeft.toString().padStart(2, '0')}:${minutesLeft.toString().padStart(2, '0')}`;
+                    
+                    if (remainingMinutes <= 0) {
+                        clearInterval(timerInterval);
+                        timerDiv.textContent = 'Время тренировки закончилось';
+                        timerDiv.style.color = 'red';
+                        
+                        // Через 5 секунд возвращаем к сканированию
+                        setTimeout(() => {
+                            localStorage.removeItem('currentLocker');
+                            window.location.reload();
+                        }, 5000);
+                    }
+                    
+                    remainingMinutes--;
+                }
+                
+                updateTimer();
+                const timerInterval = setInterval(updateTimer, 60000); // обновляем каждую минуту
+            }
+            
+            // Останавливаем камеру при выходе со страницы
+            window.addEventListener('beforeunload', stopCamera);
+        });
+    </script>
+</body>
+</html>

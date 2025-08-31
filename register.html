@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Фитнес-клуб - Регистрация</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        .checkbox-group {
+            margin: 20px 0;
+            display: flex;
+            align-items: flex-start;
+        }
+        .checkbox-group input {
+            margin-right: 10px;
+            margin-top: 3px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .back-btn {
+            margin-top: 10px;
+            background-color: #f1f1f1;
+            color: #333;
+        }
+        .error {
+            color: red;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        .user-info {
+            background-color: #e6f7ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Регистрация</h1>
+        
+        <div id="userInfo" class="user-info" style="display: none;">
+            <p>Telegram ID: <span id="telegramIdDisplay"></span></p>
+        </div>
+        
+        <form id="registrationForm">
+            <div class="form-group">
+                <label for="lastName">Фамилия *</label>
+                <input type="text" id="lastName" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="firstName">Имя *</label>
+                <input type="text" id="firstName" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="middleName">Отчество (если есть)</label>
+                <input type="text" id="middleName">
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="privacyAgreement" required>
+                <label for="privacyAgreement">Я согласен с <a href="privacy.html">политикой конфиденциальности</a></label>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="termsAgreement" required>
+                <label for="termsAgreement">Я принимаю <a href="terms.html">пользовательское соглашение</a></label>
+            </div>
+            
+            <button type="submit" id="submitBtn">Присоединиться</button>
+        </form>
+        
+        <button class="back-btn" onclick="location.href='index.html'">На главную</button>
+        
+        <div id="error" class="error"></div>
+    </div>
+
+    <script>
+        // Инициализация Telegram WebApp
+        let tg = null;
+        let telegramUserId = null;
+        
+        function initTelegram() {
+            if (window.Telegram && window.Telegram.WebApp) {
+                tg = window.Telegram.WebApp;
+                tg.expand();
+                tg.enableClosingConfirmation();
+                
+                // Получаем данные пользователя из Telegram
+                const user = tg.initDataUnsafe?.user;
+                if (user) {
+                    telegramUserId = user.id.toString();
+                    
+                    // Показываем Telegram ID пользователю
+                    document.getElementById('userInfo').style.display = 'block';
+                    document.getElementById('telegramIdDisplay').textContent = telegramUserId;
+                    
+                    // Автозаполняем имя и фамилию из Telegram
+                    if (user.first_name) {
+                        document.getElementById('firstName').value = user.first_name;
+                    }
+                    if (user.last_name) {
+                        document.getElementById('lastName').value = user.last_name;
+                    }
+                    
+                    // Проверяем, возможно пользователь уже зарегистрирован
+                    checkExistingUser();
+                } else {
+                    document.getElementById('error').textContent = 'Не удалось получить данные из Telegram. Откройте приложение через Telegram бота.';
+                    document.getElementById('submitBtn').disabled = true;
+                }
+            } else {
+                document.getElementById('error').textContent = 'Это приложение должно быть открыто через Telegram.';
+                document.getElementById('submitBtn').disabled = true;
+            }
+        }
+        
+        function checkExistingUser() {
+            const existingUser = localStorage.getItem('user');
+            if (existingUser) {
+                const userData = JSON.parse(existingUser);
+                if (userData.telegramId === telegramUserId) {
+                    // Пользователь уже зарегистрирован, заполняем форму
+                    document.getElementById('firstName').value = userData.firstName || '';
+                    document.getElementById('lastName').value = userData.lastName || '';
+                    document.getElementById('middleName').value = userData.middleName || '';
+                    
+                    document.getElementById('privacyAgreement').checked = true;
+                    document.getElementById('termsAgreement').checked = true;
+                    
+                    document.getElementById('submitBtn').textContent = 'Обновить данные';
+                }
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            initTelegram();
+            
+            const form = document.getElementById('registrationForm');
+            const submitBtn = document.getElementById('submitBtn');
+            const errorDiv = document.getElementById('error');
+            
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                if (!telegramUserId) {
+                    errorDiv.textContent = 'Не удалось получить Telegram ID. Перезагрузите приложение.';
+                    return;
+                }
+                
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Отправка...';
+                
+                const userData = {
+                    firstName: document.getElementById('firstName').value.trim(),
+                    lastName: document.getElementById('lastName').value.trim(),
+                    middleName: document.getElementById('middleName').value.trim(),
+                    telegramId: telegramUserId
+                };
+                
+                // Валидация обязательных полей
+                if (!userData.firstName || !userData.lastName) {
+                    errorDiv.textContent = 'Имя и фамилия обязательны для заполнения';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Присоединиться';
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('http://38.180.211.208:5000/api/register', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(userData)
+                    });
+                    
+                    if (response.ok) {
+                        // Сохраняем данные пользователя в localStorage
+                        localStorage.setItem('user', JSON.stringify(userData));
+                        
+                        // Показываем уведомление в Telegram
+                        if (tg) {
+                            tg.showPopup({
+                                title: 'Успешно!',
+                                message: 'Регистрация завершена. Теперь вы можете арендовать шкафчик.',
+                                buttons: [{ type: 'ok' }]
+                            }, function() {
+                                window.location.href = 'scan.html';
+                            });
+                        } else {
+                            alert('Регистрация прошла успешно!');
+                            window.location.href = 'scan.html';
+                        }
+                    } else {
+                        try {
+                            const errorData = await response.json();
+                            errorDiv.textContent = `Ошибка регистрации: ${errorData.message || `HTTP ${response.status}`}`;
+                        } catch {
+                            errorDiv.textContent = `Ошибка сервера: HTTP ${response.status}`;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Ошибка:', error);
+                    errorDiv.textContent = 'Произошла ошибка при отправке данных. Проверьте подключение к интернету.';
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Присоединиться';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

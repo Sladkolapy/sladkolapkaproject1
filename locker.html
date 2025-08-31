@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Фитнес-клуб - Мой шкафчик</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .locker-info {
+            background-color: #e6f7ff;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .timer {
+            font-size: 24px;
+            font-weight: bold;
+            color: #FF5722;
+            margin: 20px 0;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            margin-bottom: 15px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .unlock-btn {
+            background-color: #4285f4;
+        }
+        .unlock-btn:hover {
+            background-color: #357abd;
+        }
+        .back-btn {
+            background-color: #f1f1f1;
+            color: #333;
+        }
+        .status {
+            font-size: 18px;
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+        }
+        .success {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Управление шкафчиком</h1>
+        
+        <div class="locker-info">
+            <h2>Шкафчик №<span id="lockerNumber"></span></h2>
+        </div>
+        
+        <div class="timer" id="timer">
+            Осталось времени: <span id="timeLeft"></span>
+        </div>
+        
+        <div class="status" id="status">
+            Статус: <span id="lockStatus">заблокирован</span>
+        </div>
+        
+        <div class="controls">
+            <button id="toggleBtn" class="unlock-btn">Открыть шкафчик</button>
+            <button id="refreshBtn">Обновить статус</button>
+        </div>
+        
+        <div id="message" class="success"></div>
+        <div id="error" class="error"></div>
+        
+        <button class="back-btn" onclick="location.href='index.html'">На главную</button>
+        <button onclick="location.href='scan.html'" style="background-color: #FF5722;">Назад к сканированию</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const lockerNumber = localStorage.getItem('currentLocker');
+            const timerElement = document.getElementById('timeLeft');
+            const statusElement = document.getElementById('lockStatus');
+            const toggleBtn = document.getElementById('toggleBtn');
+            const refreshBtn = document.getElementById('refreshBtn');
+            const messageDiv = document.getElementById('message');
+            const errorDiv = document.getElementById('error');
+            
+            if (!lockerNumber) {
+                errorDiv.textContent = 'Шкафчик не выбран. Вернитесь на страницу сканирования.';
+                return;
+            }
+            
+            document.getElementById('lockerNumber').textContent = lockerNumber;
+            
+            // Запускаем таймер
+            startTimer();
+            
+            // Функция управления шкафчиком
+            async function toggleLocker() {
+                try {
+                    const response = await fetch(`http://38.180.211.208:5000/api/access-modules/${lockerNumber}/toggle`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({})
+                    });
+                    
+                    if (response.ok) {
+                        // Меняем текст кнопки и статус
+                        const isCurrentlyLocked = toggleBtn.textContent === 'Открыть шкафчик';
+                        toggleBtn.textContent = isCurrentlyLocked ? 'Закрыть шкафчик' : 'Открыть шкафчик';
+                        toggleBtn.className = isCurrentlyLocked ? '' : 'unlock-btn';
+                        statusElement.textContent = isCurrentlyLocked ? 'открыт' : 'заблокирован';
+                        
+                        messageDiv.textContent = `Шкафчик успешно ${isCurrentlyLocked ? 'открыт' : 'заблокирован'}`;
+                        
+                        // Если открыли, через 5 секунд предлагаем закрыть
+                        if (isCurrentlyLocked) {
+                            setTimeout(() => {
+                                if (confirm('Не забудьте закрыть шкафчик после использования')) {
+                                    toggleLocker();
+                                }
+                            }, 5000);
+                        }
+                    } else {
+                        errorDiv.textContent = 'Ошибка управления шкафчиком';
+                    }
+                } catch (error) {
+                    console.error('Ошибка:', error);
+                    errorDiv.textContent = 'Произошла ошибка. Проверьте подключение к интернету.';
+                }
+            }
+            
+            // Функция обновления статуса
+            async function refreshStatus() {
+                // В реальном приложении здесь был бы запрос к серверу для получения статуса
+                // Для демонстрации просто покажем уведомление
+                messageDiv.textContent = 'Статус обновлен';
+                setTimeout(() => {
+                    messageDiv.textContent = '';
+                }, 2000);
+            }
+            
+            // Запуск таймера
+            function startTimer() {
+                // В реальном приложении время бралось бы из localStorage или сервера
+                // Для демонстрации установим 60 минут
+                let totalMinutes = 60;
+                let remainingMinutes = totalMinutes;
+                
+                function updateTimer() {
+                    const hours = Math.floor(remainingMinutes / 60);
+                    const minutes = remainingMinutes % 60;
+                    
+                    timerElement.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                    
+                    if (remainingMinutes <= 0) {
+                        clearInterval(timerInterval);
+                        timerElement.textContent = '00:00';
+                        toggleBtn.disabled = true;
+                        statusElement.textContent = 'время истекло';
+                        statusElement.style.color = 'red';
+                        
+                        // Автоматически блокируем шкафчик при истечении времени
+                        if (toggleBtn.textContent === 'Закрыть шкафчик') {
+                            toggleLocker();
+                        }
+                    }
+                    
+                    remainingMinutes--;
+                }
+                
+                updateTimer();
+                const timerInterval = setInterval(updateTimer, 60000); // обновляем каждую минуту
+            }
+            
+            // Обработчики событий
+            toggleBtn.addEventListener('click', toggleLocker);
+            refreshBtn.addEventListener('click', refreshStatus);
+            
+            // Проверяем время при загрузке
+            const currentTime = new Date().getTime();
+            const endTime = localStorage.getItem('lockerEndTime');
+            if (endTime && currentTime > parseInt(endTime)) {
+                toggleBtn.disabled = true;
+                statusElement.textContent = 'время истекло';
+                statusElement.style.color = 'red';
+            }
+        });
+    </script>
+</body>
+</html>
